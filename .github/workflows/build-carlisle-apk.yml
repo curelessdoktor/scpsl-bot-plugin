@@ -1,0 +1,66 @@
+name: Build Carlisle Now APK
+
+on:
+  push:
+    branches: [claude/carlisle-news-app-htrIY, master]
+    paths: ['carlisle-app/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: carlisle-app/package-lock.json
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+
+      - name: Install dependencies
+        working-directory: carlisle-app
+        run: npm ci
+
+      - name: Build web assets
+        working-directory: carlisle-app
+        run: npm run build
+
+      - name: Add Android platform
+        working-directory: carlisle-app
+        run: npx cap add android
+
+      - name: Sync web assets into Android
+        working-directory: carlisle-app
+        run: npx cap sync android
+
+      - name: Make Gradle wrapper executable
+        working-directory: carlisle-app/android
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK
+        working-directory: carlisle-app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p artifacts
+          cp carlisle-app/android/app/build/outputs/apk/debug/app-debug.apk \
+             artifacts/CarlisleNow.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarlisleNow-APK
+          path: artifacts/CarlisleNow.apk
+          retention-days: 30
